@@ -37,18 +37,23 @@
 
 
 //the LCD will always be IIC, so we'll strip out alot of the LiquidCrystal Library
-robotgeekLCD::robotgeekLCD()
+
+
+
+robotgeekLCD::robotgeekLCD(uint8_t address)
 {
-  init();
+  init(0x27);
+  
 }
 
 
 
 //always four bit mode
-void robotgeekLCD::init()
+void robotgeekLCD::init(uint8_t address)
 {
-  Wire.begin(); // join i2c bus (address optional for master)
 
+  Wire.begin(); // join i2c bus (address optional for master)
+	
   _rs_pin =0;
   _rw_pin = 1;
   _enable_pin = 2;
@@ -63,21 +68,22 @@ void robotgeekLCD::init()
   _data_pins[7] = 7; 
 
 //always 4 bit mode
-    _displayfunction = LCD_4BITMODE | LCD_1LINE | LCD_5x8DOTS;
+    _displayfunction = LCD_4BITMODE | LCD_2LINE | LCD_5x8DOTS;
+
+
 
 	//always 16/x
-  begin(16, 2);  
+  begin(address);  
 }
 
-void robotgeekLCD::begin(uint8_t cols, uint8_t lines, uint8_t dotsize) {
-  if (lines > 1) {
-    _displayfunction |= LCD_2LINE;
-  }
-  _numlines = lines;
+void robotgeekLCD::begin(uint8_t address) {
+
+
+  _numlines = 2;
   _currline = 0;
 
 
-
+	int tadd = address;
 
   // SEE PAGE 45/46 FOR INITIALIZATION SPECIFICATION!
   // according to datasheet, we need at least 40ms after power rises above 2.7V
@@ -91,8 +97,7 @@ void robotgeekLCD::begin(uint8_t cols, uint8_t lines, uint8_t dotsize) {
   Wire.endTransmission();    // stop transmitting
 
 
-  //put the LCD into 4 bit or 8 bit mode
-  if (! (_displayfunction & LCD_8BITMODE)) {
+
     // this is according to the hitachi HD44780 datasheet
     // figure 24, pg 46
 
@@ -110,7 +115,7 @@ void robotgeekLCD::begin(uint8_t cols, uint8_t lines, uint8_t dotsize) {
 
     // finally, set to 4-bit interface
     write4bits(0x02); 
-  } 
+    
   
   
 
@@ -163,6 +168,100 @@ void robotgeekLCD::display() {
   _displaycontrol |= LCD_DISPLAYON;
   command(LCD_DISPLAYCONTROL | _displaycontrol);
 }
+
+
+// Turn the display on/off (quickly)
+void robotgeekLCD::nooBacklight() {
+
+
+
+		_iicLastSent = _iicLastSent & (~B00001000);
+		Wire.beginTransmission(0x27); // transmit to device 0x27, lcd
+		Wire.write(_iicLastSent);              // sends one byte, sets RS,R/W, and enable low  
+		Wire.endTransmission();    // stop transmitting
+		
+		delay(1000);
+		
+		
+		_iicLastSent = _iicLastSent | B00001000;
+		
+		Wire.beginTransmission(0x27); // transmit to device 0x27, lcd
+		Wire.write(_iicLastSent);              // sends one byte, sets RS,R/W, and enable low  
+		Wire.endTransmission();    // stop transmitting
+		
+		
+		delay(1000);
+		
+			
+		_iicLastSent = _iicLastSent & (~B00001000);
+		Wire.beginTransmission(0x27); // transmit to device 0x27, lcd
+		Wire.write(_iicLastSent);              // sends one byte, sets RS,R/W, and enable low  
+		Wire.endTransmission();    // stop transmitting
+		
+		delay(1000);
+		
+		
+		_iicLastSent = _iicLastSent | B00001000;
+		
+		Wire.beginTransmission(0x27); // transmit to device 0x27, lcd
+		Wire.write(_iicLastSent);              // sends one byte, sets RS,R/W, and enable low  
+		Wire.endTransmission();    // stop transmitting
+		
+		
+		delay(1000);
+		
+			
+		_iicLastSent = _iicLastSent & (~B00001000);
+		Wire.beginTransmission(0x27); // transmit to device 0x27, lcd
+		Wire.write(_iicLastSent);              // sends one byte, sets RS,R/W, and enable low  
+		Wire.endTransmission();    // stop transmitting
+		
+		delay(1000);
+		
+		
+		_iicLastSent = _iicLastSent | B00001000;
+		
+		Wire.beginTransmission(0x27); // transmit to device 0x27, lcd
+		Wire.write(_iicLastSent);              // sends one byte, sets RS,R/W, and enable low  
+		Wire.endTransmission();    // stop transmitting
+		
+		
+		delay(1000);
+		
+				
+			
+		
+		
+}
+
+// Turn the display on/off (quickly)
+void robotgeekLCD::noBacklight() {
+
+
+
+		_iicLastSent = _iicLastSent & (~B00001000);
+		Wire.beginTransmission(0x27); // transmit to device 0x27, lcd
+		Wire.write(_iicLastSent);              // sends one byte, sets RS,R/W, and enable low  
+		Wire.endTransmission();    // stop transmitting
+
+
+				
+			
+		
+		
+}
+
+void robotgeekLCD::backlight() {
+		_iicLastSent = _iicLastSent | B00001000;
+		
+		Wire.beginTransmission(0x27); // transmit to device 0x27, lcd
+		Wire.write(_iicLastSent);              // sends one byte, sets RS,R/W, and enable low  
+		Wire.endTransmission();    // stop transmitting
+		
+		
+}
+
+
 
 // Turns the underline cursor on/off
 void robotgeekLCD::noCursor() {
@@ -325,11 +424,3 @@ void robotgeekLCD::write4bits(uint8_t value) {
 }
 
 
-void robotgeekLCD::write8bits(uint8_t value) {
-  for (int i = 0; i < 8; i++) {
-    pinMode(_data_pins[i], OUTPUT);
-    digitalWrite(_data_pins[i], (value >> i) & 0x01);
-  }
-  
-  pulseEnable();
-}
