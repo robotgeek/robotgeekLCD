@@ -94,6 +94,9 @@ private:
   uint8_t _enable_pin; // activated by a HIGH pulse.
   uint8_t _data_pins[8];
 
+
+  uint8_t _iicLastSent;
+  
   uint8_t _displayfunction;
   uint8_t _displaycontrol;
   uint8_t _displaymode;

@@ -5,6 +5,8 @@
 #include <inttypes.h>
 #include "Arduino.h"
 
+#include <Wire.h>
+
 // When the display powers up, it is configured as follows:
 //
 // 1. Display clear
@@ -24,62 +26,47 @@
 // can't assume that its in that state when a sketch starts (and the
 // robotgeekLCD constructor is called).
 
-robotgeekLCD::robotgeekLCD(uint8_t rs, uint8_t rw, uint8_t enable,
-			     uint8_t d0, uint8_t d1, uint8_t d2, uint8_t d3,
-			     uint8_t d4, uint8_t d5, uint8_t d6, uint8_t d7)
+//Rs-p0
+//R/W-p2
+//E-p2
+//Backlight-p3
+//DB4-p4
+//DB5-p5
+//DB6-p6
+//DB7-p7
+
+
+//the LCD will always be IIC, so we'll strip out alot of the LiquidCrystal Library
+robotgeekLCD::robotgeekLCD()
 {
-  init(0, rs, rw, enable, d0, d1, d2, d3, d4, d5, d6, d7);
+  init();
 }
 
-robotgeekLCD::robotgeekLCD(uint8_t rs, uint8_t enable,
-			     uint8_t d0, uint8_t d1, uint8_t d2, uint8_t d3,
-			     uint8_t d4, uint8_t d5, uint8_t d6, uint8_t d7)
-{
-  init(0, rs, 255, enable, d0, d1, d2, d3, d4, d5, d6, d7);
-}
 
-robotgeekLCD::robotgeekLCD(uint8_t rs, uint8_t rw, uint8_t enable,
-			     uint8_t d0, uint8_t d1, uint8_t d2, uint8_t d3)
-{
-  init(1, rs, rw, enable, d0, d1, d2, d3, 0, 0, 0, 0);
-}
 
-robotgeekLCD::robotgeekLCD(uint8_t rs,  uint8_t enable,
-			     uint8_t d0, uint8_t d1, uint8_t d2, uint8_t d3)
+//always four bit mode
+void robotgeekLCD::init()
 {
-  init(1, rs, 255, enable, d0, d1, d2, d3, 0, 0, 0, 0);
-}
+  Wire.begin(); // join i2c bus (address optional for master)
 
-void robotgeekLCD::init(uint8_t fourbitmode, uint8_t rs, uint8_t rw, uint8_t enable,
-			 uint8_t d0, uint8_t d1, uint8_t d2, uint8_t d3,
-			 uint8_t d4, uint8_t d5, uint8_t d6, uint8_t d7)
-{
-  _rs_pin = rs;
-  _rw_pin = rw;
-  _enable_pin = enable;
+  _rs_pin =0;
+  _rw_pin = 1;
+  _enable_pin = 2;
   
-  _data_pins[0] = d0;
-  _data_pins[1] = d1;
-  _data_pins[2] = d2;
-  _data_pins[3] = d3; 
-  _data_pins[4] = d4;
-  _data_pins[5] = d5;
-  _data_pins[6] = d6;
-  _data_pins[7] = d7; 
+  _data_pins[0] = 0;
+  _data_pins[1] = 0;
+  _data_pins[2] = 0;
+  _data_pins[3] = 0; 
+  _data_pins[4] = 4;
+  _data_pins[5] = 5;
+  _data_pins[6] = 6;
+  _data_pins[7] = 7; 
 
-  pinMode(_rs_pin, OUTPUT);
-  // we can save 1 pin by not using RW. Indicate by passing 255 instead of pin#
-  if (_rw_pin != 255) { 
-    pinMode(_rw_pin, OUTPUT);
-  }
-  pinMode(_enable_pin, OUTPUT);
-  
-  if (fourbitmode)
+//always 4 bit mode
     _displayfunction = LCD_4BITMODE | LCD_1LINE | LCD_5x8DOTS;
-  else 
-    _displayfunction = LCD_8BITMODE | LCD_1LINE | LCD_5x8DOTS;
-  
-  begin(16, 1);  
+
+	//always 16/x
+  begin(16, 2);  
 }
 
 void robotgeekLCD::begin(uint8_t cols, uint8_t lines, uint8_t dotsize) {
@@ -89,22 +76,21 @@ void robotgeekLCD::begin(uint8_t cols, uint8_t lines, uint8_t dotsize) {
   _numlines = lines;
   _currline = 0;
 
-  // for some 1 line displays you can select a 10 pixel high font
-  if ((dotsize != 0) && (lines == 1)) {
-    _displayfunction |= LCD_5x10DOTS;
-  }
+
+
 
   // SEE PAGE 45/46 FOR INITIALIZATION SPECIFICATION!
   // according to datasheet, we need at least 40ms after power rises above 2.7V
   // before sending commands. Arduino can turn on way befer 4.5V so we'll wait 50
   delayMicroseconds(50000); 
   // Now we pull both RS and R/W low to begin commands
-  digitalWrite(_rs_pin, LOW);
-  digitalWrite(_enable_pin, LOW);
-  if (_rw_pin != 255) { 
-    digitalWrite(_rw_pin, LOW);
-  }
   
+  _iicLastSent = B00000000;
+  Wire.beginTransmission(0x27); // transmit to device 0x27, lcd
+  Wire.write(_iicLastSent);              // sends one byte, sets RS,R/W, and enable low  
+  Wire.endTransmission();    // stop transmitting
+
+
   //put the LCD into 4 bit or 8 bit mode
   if (! (_displayfunction & LCD_8BITMODE)) {
     // this is according to the hitachi HD44780 datasheet
@@ -124,21 +110,9 @@ void robotgeekLCD::begin(uint8_t cols, uint8_t lines, uint8_t dotsize) {
 
     // finally, set to 4-bit interface
     write4bits(0x02); 
-  } else {
-    // this is according to the hitachi HD44780 datasheet
-    // page 45 figure 23
-
-    // Send function set command sequence
-    command(LCD_FUNCTIONSET | _displayfunction);
-    delayMicroseconds(4500);  // wait more than 4.1ms
-
-    // second try
-    command(LCD_FUNCTIONSET | _displayfunction);
-    delayMicroseconds(150);
-
-    // third go
-    command(LCD_FUNCTIONSET | _displayfunction);
-  }
+  } 
+  
+  
 
   // finally, set # lines, font size, etc.
   command(LCD_FUNCTIONSET | _displayfunction);  
@@ -267,38 +241,89 @@ inline size_t robotgeekLCD::write(uint8_t value) {
 
 // write either command or data, with automatic 4/8-bit selection
 void robotgeekLCD::send(uint8_t value, uint8_t mode) {
-  digitalWrite(_rs_pin, mode);
+
+	//int tempValue = mode;//rspin high
+	//tempValue = tempValue &(~(1<<2))//rw_pin low
+	
+
+
+	if(mode == 1)
+	{
+		_iicLastSent = _iicLastSent | B00000001;
+		_iicLastSent = _iicLastSent & (~B00000010);
+		Wire.beginTransmission(0x27); // transmit to device 0x27, lcd
+		Wire.write(_iicLastSent);              // sends one byte, sets RS,R/W, and enable low  
+		Wire.endTransmission();    // stop transmitting
+	}
+	else
+	{
+	
+		_iicLastSent = _iicLastSent & (~B00000011);
+		Wire.beginTransmission(0x27); // transmit to device 0x27, lcd
+		Wire.write(_iicLastSent);              // sends one byte, sets RS,R/W, and enable low  
+		Wire.endTransmission();    // stop transmitting
+	
+	
+	}
+
+
+
+  //digitalWrite(_rs_pin, mode);
 
   // if there is a RW pin indicated, set it low to Write
-  if (_rw_pin != 255) { 
+ /* if (_rw_pin != 255) { 
     digitalWrite(_rw_pin, LOW);
   }
   
   if (_displayfunction & LCD_8BITMODE) {
     write8bits(value); 
-  } else {
+  } 
+  else {
+  */  
     write4bits(value>>4);
     write4bits(value);
-  }
+  //}
 }
 
 void robotgeekLCD::pulseEnable(void) {
-  digitalWrite(_enable_pin, LOW);
-  delayMicroseconds(1);    
-  digitalWrite(_enable_pin, HIGH);
+
+
+  
+  _iicLastSent = _iicLastSent & (~B00000100);//mask last send with inverse enable bit to turn it off 
+  Wire.beginTransmission(0x27); // transmit to device 0x27, lcd
+  Wire.write(_iicLastSent);              // sends one byte, sets RS,R/W, and enable low  
+  Wire.endTransmission();    // stop transmitting
+
+  delayMicroseconds(1);   // enable pulse must be >450ns 
+  
+  _iicLastSent = _iicLastSent | B00000100;//mask last send with enable bit to turn it on 
+  Wire.beginTransmission(0x27); // transmit to device 0x27, lcd
+  Wire.write(_iicLastSent);              // sends one byte, sets RS,R/W, and enable low  
+  Wire.endTransmission();    // stop transmitting
+
   delayMicroseconds(1);    // enable pulse must be >450ns
-  digitalWrite(_enable_pin, LOW);
-  delayMicroseconds(100);   // commands need > 37us to settle
+  
+  _iicLastSent = _iicLastSent & (~B00000100);//mask last send with inverse enable bit to turn it off 
+  Wire.beginTransmission(0x27); // transmit to device 0x27, lcd
+  Wire.write(_iicLastSent);              // sends one byte, sets RS,R/W, and enable low  
+  Wire.endTransmission();    // stop transmitting
+
+  delayMicroseconds(100);    // commands need > 37us to settle
+
+
+
 }
 
 void robotgeekLCD::write4bits(uint8_t value) {
-  for (int i = 0; i < 4; i++) {
-    pinMode(_data_pins[i], OUTPUT);
-    digitalWrite(_data_pins[i], (value >> i) & 0x01);
-  }
 
-  pulseEnable();
+	int tempValue = value << 4;//shift the value up 8 bits
+	_iicLastSent = _iicLastSent | (tempValue);//mask last sent value with value bits 
+	Wire.beginTransmission(0x27); // transmit to device 0x27, lcd
+	Wire.write(_iicLastSent);              // sends one byte, sets RS,R/W, and enable low  
+	Wire.endTransmission();    // stop transmitting
+	pulseEnable();
 }
+
 
 void robotgeekLCD::write8bits(uint8_t value) {
   for (int i = 0; i < 8; i++) {
