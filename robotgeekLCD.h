@@ -106,6 +106,11 @@ private:
   uint8_t _initialized;
 
   uint8_t _numlines,_currline;
+  //bargrpah
+  //shift increment/
+  //shift decrement
+  //contrast
+  
 };
 
 #endif
