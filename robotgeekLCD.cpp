@@ -1,11 +1,11 @@
 #include "robotgeekLCD.h"
 
-#include <stdio.h>
-#include <string.h>
+
 #include <inttypes.h>
 #include "Arduino.h"
 
 #include <Wire.h>
+
 
 // When the display powers up, it is configured as follows:
 //
@@ -42,8 +42,8 @@
 
 robotgeekLCD::robotgeekLCD(uint8_t address)
 {
-  init(0x27);
-  
+ // init(0x27);//don't call init from here! all sorts of weirdness from the wire library
+  _backlight = 1;
 }
 
 
@@ -92,10 +92,14 @@ void robotgeekLCD::begin(uint8_t address) {
   // Now we pull both RS and R/W low to begin commands
   
   _iicLastSent = B00000000;
-  Wire.beginTransmission(0x27); // transmit to device 0x27, lcd
-  Wire.write(_iicLastSent);              // sends one byte, sets RS,R/W, and enable low  
-  Wire.endTransmission();    // stop transmitting
-
+  
+	writeIIC(0);
+  /*
+	Wire.beginTransmission(0x27); // transmit to device 0x27, lcd
+	Wire.write(_iicLastSent);              // sends one byte, sets RS,R/W, and enable low  
+delay(1000);
+	Wire.endTransmission();   
+*/
 
 
     // this is according to the hitachi HD44780 datasheet
@@ -116,23 +120,33 @@ void robotgeekLCD::begin(uint8_t address) {
     // finally, set to 4-bit interface
     write4bits(0x02); 
     
+  Serial.println("done init");
   
   
+Serial.println("------------");
+Serial.println(LCD_FUNCTIONSET | _displayfunction, BIN);
+Serial.println("-----------");
 
   // finally, set # lines, font size, etc.
   command(LCD_FUNCTIONSET | _displayfunction);  
 
+  Serial.println("done functionset");
   // turn the display on with no cursor or blinking default
   _displaycontrol = LCD_DISPLAYON | LCD_CURSOROFF | LCD_BLINKOFF;  
-  display();
+  noDisplay();
 
   // clear it off
+  Serial.println("clear");
   clear();
+  Serial.println("done clear");
+  
 
   // Initialize to default text direction (for romance languages)
   _displaymode = LCD_ENTRYLEFT | LCD_ENTRYSHIFTDECREMENT;
   // set the entry mode
   command(LCD_ENTRYMODESET | _displaymode);
+  
+    display();
 
 }
 
@@ -336,6 +350,8 @@ inline size_t robotgeekLCD::write(uint8_t value) {
   return 1; // assume sucess
 }
 
+
+
 /************ low level data pushing commands **********/
 
 // write either command or data, with automatic 4/8-bit selection
@@ -348,63 +364,56 @@ void robotgeekLCD::send(uint8_t value, uint8_t mode) {
 
 	if(mode == 1)
 	{
-		_iicLastSent = _iicLastSent | B00000001;
+		/*_iicLastSent = _iicLastSent | B00000001;
 		_iicLastSent = _iicLastSent & (~B00000010);
 		Wire.beginTransmission(0x27); // transmit to device 0x27, lcd
 		Wire.write(_iicLastSent);              // sends one byte, sets RS,R/W, and enable low  
-		Wire.endTransmission();    // stop transmitting
+		//Wire.endTransmission();    // stop transmitting
+		*/
+    write4bitsData(byte(value>>4));
+    write4bitsData(byte((value&1111)));
+    
 	}
 	else
 	{
 	
-		_iicLastSent = _iicLastSent & (~B00000011);
+		/*_iicLastSent = _iicLastSent & (~B00000011);
 		Wire.beginTransmission(0x27); // transmit to device 0x27, lcd
 		Wire.write(_iicLastSent);              // sends one byte, sets RS,R/W, and enable low  
-		Wire.endTransmission();    // stop transmitting
-	
+		//Wire.endTransmission();    // stop transmitting
+	*/
+	Serial.print("VALUE:");
+	Serial.println(value,BIN);
+    write4bitsCommand(value>>4);
+    write4bitsCommand(value & B00001111);
 	
 	}
 
 
-
-  //digitalWrite(_rs_pin, mode);
-
-  // if there is a RW pin indicated, set it low to Write
- /* if (_rw_pin != 255) { 
-    digitalWrite(_rw_pin, LOW);
-  }
-  
-  if (_displayfunction & LCD_8BITMODE) {
-    write8bits(value); 
-  } 
-  else {
-  */  
-    write4bits(value>>4);
-    write4bits(value);
   //}
 }
 
-void robotgeekLCD::pulseEnable(void) {
+void robotgeekLCD::pulseEnable(uint8_t current) {
 
 
-  
-  _iicLastSent = _iicLastSent & (~B00000100);//mask last send with inverse enable bit to turn it off 
+   
+  current = current & (~B00000100);//mask last send with inverse enable bit to turn it off 
   Wire.beginTransmission(0x27); // transmit to device 0x27, lcd
-  Wire.write(_iicLastSent);              // sends one byte, sets RS,R/W, and enable low  
+  Wire.write(current);              // sends one byte, sets RS,R/W, and enable low  
   Wire.endTransmission();    // stop transmitting
 
   delayMicroseconds(1);   // enable pulse must be >450ns 
   
-  _iicLastSent = _iicLastSent | B00000100;//mask last send with enable bit to turn it on 
+  current = current | B00000100;//mask last send with enable bit to turn it on 
   Wire.beginTransmission(0x27); // transmit to device 0x27, lcd
-  Wire.write(_iicLastSent);              // sends one byte, sets RS,R/W, and enable low  
+  Wire.write(current);              // sends one byte, sets RS,R/W, and enable low  
   Wire.endTransmission();    // stop transmitting
 
   delayMicroseconds(1);    // enable pulse must be >450ns
   
-  _iicLastSent = _iicLastSent & (~B00000100);//mask last send with inverse enable bit to turn it off 
+  current = current & (~B00000100);//mask last send with inverse enable bit to turn it off 
   Wire.beginTransmission(0x27); // transmit to device 0x27, lcd
-  Wire.write(_iicLastSent);              // sends one byte, sets RS,R/W, and enable low  
+  Wire.write(current);              // sends one byte, sets RS,R/W, and enable low  
   Wire.endTransmission();    // stop transmitting
 
   delayMicroseconds(100);    // commands need > 37us to settle
@@ -413,14 +422,56 @@ void robotgeekLCD::pulseEnable(void) {
 
 }
 
-void robotgeekLCD::write4bits(uint8_t value) {
+void robotgeekLCD::write4bitsCommand(uint8_t value){
+	//Serial.println(value, BIN);
+	int tempValue = (value<<4) | (_backlight<<3);//shift the value up 4 bits, add backlight bit. En,RW,RS are all 0
+	//Serial.println(tempValue, BIN);
+	
+	
+	
+	Serial.print("COMMAND:");
+	Serial.println(tempValue, BIN);
+	Wire.beginTransmission(0x27); // transmit to device 0x27, lcd
+	Wire.write(tempValue);              // sends one byte, sets RS,R/W, and enable low  
+	Wire.endTransmission();    // stop transmitting
+	pulseEnable(tempValue);
+}
 
+void robotgeekLCD::write4bitsData(uint8_t value){
+	//Serial.println(value, BIN);
+	int tempValue = (value << 4) | (_backlight <<3)| 0x1;///shift the value up 4 bits, add backlight bit. En,RW, are 0, rs = 1
+	//Serial.println(tempValue, BIN);
+	
+	
+	
+	Serial.print("SEND:");
+	Serial.println(tempValue, BIN);
+	Wire.beginTransmission(0x27); // transmit to device 0x27, lcd
+	Wire.write(tempValue);              // sends one byte, sets RS,R/W, and enable low  
+	Wire.endTransmission();    // stop transmitting
+	pulseEnable(tempValue);
+}
+
+
+void robotgeekLCD::write4bits(uint8_t value)
+{
+	//Serial.println(value, BIN);
 	int tempValue = value << 4;//shift the value up 8 bits
+	//Serial.println(tempValue, BIN);
+	_iicLastSent = _iicLastSent & (~B11110000);//mask last sent value with value bits 
 	_iicLastSent = _iicLastSent | (tempValue);//mask last sent value with value bits 
+	Serial.println(_iicLastSent, BIN);
 	Wire.beginTransmission(0x27); // transmit to device 0x27, lcd
 	Wire.write(_iicLastSent);              // sends one byte, sets RS,R/W, and enable low  
 	Wire.endTransmission();    // stop transmitting
-	pulseEnable();
+	pulseEnable(tempValue);
+}
+
+
+void robotgeekLCD::writeIIC(uint8_t _data){                                        
+	Wire.beginTransmission(0x27);
+	Wire.write(0);
+	Wire.endTransmission();   
 }
 
 

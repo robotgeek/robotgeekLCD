@@ -1,9 +1,10 @@
 #ifndef robotgeekLCD_h
 #define robotgeekLCD_h
 
-#include <inttypes.h>
-#include "Print.h"
 
+#include <inttypes.h>
+#include "Print.h" 
+#include <Wire.h>
 // commands
 #define LCD_CLEARDISPLAY 0x01
 #define LCD_RETURNHOME 0x02
@@ -58,6 +59,7 @@ public:
   void noBacklight();
   void nooBacklight();
   void backlight();
+  void writeIIC(uint8_t _data);
   
   
   void noDisplay();
@@ -80,11 +82,14 @@ public:
   
   using Print::write;
 private:
+	//void expanderSend(uint8_t data, uint8_t backlight, uint8_t enableex, uint8_t rsex, uint8_t rwex)
+
   void send(uint8_t, uint8_t);
   void write4bits(uint8_t);
+  void write4bitsData(uint8_t);
+  void write4bitsCommand(uint8_t);
   void write8bits(uint8_t);
-  void pulseEnable();
-
+  void pulseEnable(uint8_t current);
   uint8_t _rs_pin; // LOW: command.  HIGH: character.
   uint8_t _rw_pin; // LOW: write to LCD.  HIGH: read from LCD.
   uint8_t _enable_pin; // activated by a HIGH pulse.
@@ -92,6 +97,7 @@ private:
 
 
   uint8_t _iicLastSent;
+  uint8_t _backlight;
   
   uint8_t _displayfunction;
   uint8_t _displaycontrol;
