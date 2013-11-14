@@ -139,9 +139,10 @@ public:
   void createChar(uint8_t, uint8_t[]);
   void setCursor(uint8_t, uint8_t); 
   virtual size_t write(uint8_t);
+  
   void command(uint8_t);
   
-  using Print::write;
+  //using Print::write;
 private:
 	//void expanderSend(uint8_t data, uint8_t backlight, uint8_t enableex, uint8_t rsex, uint8_t rwex)
 

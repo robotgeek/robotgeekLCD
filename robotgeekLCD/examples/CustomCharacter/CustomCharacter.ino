@@ -242,13 +242,13 @@ void setup() {
   
   // Print a message to the lcd.
   lcd.print("I "); 
-  lcd.write((byte)0);      //For some reason lcd.write(0); will return an error.  Use lcd.write((byte)0);  to bypass this error. This is only needed for character '0'  
+  lcd.write(0);     
   lcd.print(" Arduino! ");
   
   //set the cursor to the second row, first character
   lcd.setCursor(0, 1);
   //write the 8 custom characters to the display
-  lcd.write((byte)0);//For some reason lcd.write(0); will return an error.  Use lcd.write((byte)0);  to bypass this error. This is only needed for character '0'  
+  lcd.write(0);
   lcd.write(1);
   lcd.write(2);
   lcd.write(3);
