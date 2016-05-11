@@ -104,12 +104,17 @@
 #define LCD_5x10DOTS 0x04
 #define LCD_5x8DOTS 0x00
 
+
+
 class RobotGeekLCD : public Print {
 public:
   RobotGeekLCD();
-  
-
+  int colcol;
+  signed int columnN;//row number
+  signed int rowN;//column number
   void init();
+  void init(uint8_t numRows, uint8_t numColumns);
+  void init(uint8_t numRows, uint8_t numColumns,bool overflowMode);
     
   void begin(uint8_t address);
 
@@ -156,7 +161,9 @@ private:
   uint8_t _rw_pin; // LOW: write to LCD.  HIGH: read from LCD.
   uint8_t _enable_pin; // activated by a HIGH pulse.
   uint8_t _data_pins[8];
-
+  uint8_t _numColumns;
+  uint8_t _numRows;
+  uint8_t _overFlowMode;
 
   uint8_t _iicLastSent;
   uint8_t _backlight;
@@ -168,6 +175,9 @@ private:
   uint8_t _initialized;
 
   uint8_t _numlines,_currline;
+  uint8_t _customCharFlag;// flag goes high when writing custom characters
+
+  int8_t _direction;
   //bargrpah
   //shift increment/
   //shift decrement

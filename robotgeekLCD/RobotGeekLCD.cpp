@@ -68,18 +68,42 @@
 //the LCD will always be IIC, so we'll strip out alot of the LiquidCrystal Library
 
 
+
+
+
+
 RobotGeekLCD::RobotGeekLCD()
 {
-	//init(0x27);//don't call init from here! all sorts of weirdness from the wire library
-  	_backlight = 1; //backlight will be set on by default
+  //init(0x27);//don't call init from here! all sorts of weirdness from the wire library
+    _backlight = 1; //backlight will be set on by default
+    _overFlowMode = 0;
+}
+
+
+//old style init - for legacy code with 16x2 display
+//because overflowMode is set to 0, it doesn't really matter what the row/columns are set to, we've just put 16,2 here to comply with the function
+
+void RobotGeekLCD::init()
+{
+  init(2,16,0);
+}
+
+void RobotGeekLCD::init(uint8_t numRows , uint8_t numColumns)
+{
+  init(numRows,numColumns,1); //initialze, assumimg overflow is on
 }
 
 //always four bit mode for the rg lcd
-void RobotGeekLCD::init()
+void RobotGeekLCD::init(uint8_t numRows , uint8_t numColumns, bool overFlowMode )
 {
   //I2C address for the RobotGeek I2C LCD - this is hard wired to 0x27
   int address =0x27;	
-  
+    _direction = 1;
+    _numColumns = numColumns;
+    _numRows = numRows;
+    _overFlowMode = overFlowMode;
+    _customCharFlag = 0;
+
   Wire.begin(); // join i2c bus
 	
   _rs_pin =0;
@@ -104,7 +128,7 @@ void RobotGeekLCD::init()
 
 void RobotGeekLCD::begin(uint8_t address) 
 {
-	_numlines = 2;
+	_numlines = 4;
 	_currline = 0;
 
 	int tadd = address;
@@ -167,12 +191,16 @@ void RobotGeekLCD::clear()
 {
   command(LCD_CLEARDISPLAY);  // clear display, set cursor position to zero
   delayMicroseconds(2000);  // this command takes a long time!
+  columnN = 0;
+  rowN = 0;
 }
 
 void RobotGeekLCD::home()
 {
   command(LCD_RETURNHOME);  // set cursor position to zero
   delayMicroseconds(2000);  // this command takes a long time!
+  columnN = 0;
+  rowN = 0;
 }
 
 void RobotGeekLCD::setCursor(uint8_t col, uint8_t row)
@@ -183,6 +211,10 @@ void RobotGeekLCD::setCursor(uint8_t col, uint8_t row)
   }
   
   command(LCD_SETDDRAMADDR | (col + row_offsets[row]));
+
+  
+  columnN = col;
+  rowN = row;
 }
 
 // Turn the display on/off (quickly)
@@ -248,12 +280,14 @@ void RobotGeekLCD::scrollDisplayRight(void) {
 
 // This is for text that flows Left to Right
 void RobotGeekLCD::leftToRight(void) {
+  _direction = 1;
   _displaymode |= LCD_ENTRYLEFT;
   command(LCD_ENTRYMODESET | _displaymode);
 }
 
 // This is for text that flows Right to Left
 void RobotGeekLCD::rightToLeft(void) {
+  _direction = -1;
   _displaymode &= ~LCD_ENTRYLEFT;
   command(LCD_ENTRYMODESET | _displaymode);
 }
@@ -276,7 +310,10 @@ void RobotGeekLCD::createChar(uint8_t location, uint8_t charmap[]) {
   location &= 0x7; // we only have 8 locations 0-7
   command(LCD_SETCGRAMADDR | (location << 3));
   for (int i=0; i<8; i++) {
+    _customCharFlag = 1;
     write(charmap[i]);
+    _customCharFlag = 0;
+  
   }
 }
 
@@ -286,7 +323,71 @@ inline void RobotGeekLCD::command(uint8_t value) {
   send(value, LOW);
 }
 
+
+
 inline size_t RobotGeekLCD::write(uint8_t value) {
+
+  if(_customCharFlag == 0)//don't run character management when creating custom character
+  {
+    //overflow mode puts the text on the next line, up to the end of the display
+    if(_overFlowMode == true)
+    { 
+      if(columnN >= _numColumns)
+      {
+
+        rowN++;
+        if(rowN >= _numRows)
+        {
+          setCursor(_numColumns-1,_numRows-1); //set cursor to last possible position
+          rowN = _numRows ; //save rowN to larger than last possible position to stop anything from printing anywhere else
+          columnN = _numColumns;//save columnN to larger than last possible position to stop anything from printing anywhere else
+          return 0;
+        }
+        columnN = 0;
+        setCursor(columnN,rowN);
+      }
+      if(columnN < 0)
+      {
+
+        rowN--;
+        if(rowN < 0)
+        {
+          setCursor(0,0); //set cursor to first possible position
+          rowN = -1 ; //save rowN to smallest than last possible position to stop anything from printing anywhere else
+          columnN = -1;//save columnN to smallest than last possible position to stop anything from printing anywhere else
+          return 0;
+        }
+        columnN = 19;
+        setCursor(columnN,rowN);
+      }
+    }
+
+    //if overflow is off for a 20x4, then stop writing at the end of the line
+    if(_overFlowMode == false && _numRows == 4 && _numColumns == 20)
+    { 
+      if(columnN >= _numColumns)
+      {
+          setCursor(_numColumns - 1,rowN);//set cursor to last possible position in current row
+          columnN =  _numColumns;//save columnN to larger than last possible position to stop anything from printing anywhere else
+         
+          return 0;
+      }
+    }
+
+    //otherwise asume 16x2 display, and don't do antyhing special in order to preserve the scroll/autoscroll features
+    if(_direction == 1)
+    {
+      columnN = columnN + 1;
+
+    }
+    else if (_direction == -1)
+    {
+      columnN = columnN - 1;
+
+    }
+    //columnN++;
+  }
+  
   send(value, HIGH);
   return 1; // assume sucess
 }
